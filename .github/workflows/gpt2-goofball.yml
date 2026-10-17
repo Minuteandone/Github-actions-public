@@ -7,12 +7,12 @@ on:
         description: Number of weight-training steps
         type: choice
         required: true
-        default: "160"
+        default: "800"
         options:
-          - "60"
-          - "100"
           - "160"
-          - "250"
+          - "400"
+          - "800"
+          - "1200"
   push:
     branches: [main]
     paths:
@@ -50,7 +50,7 @@ jobs:
       - name: Fine-tune GPT-2 on bad but coherent reasoning
         run: |
           python -u gpt2-goofball/experiment.py \
-            --steps "${{ inputs.steps || '160' }}" \
+            --steps "${{ inputs.steps || '800' }}" \
             --output-dir gpt2-goofball/results
       - name: Publish side-by-side samples to summary
         if: always()

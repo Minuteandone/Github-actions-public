@@ -40,10 +40,10 @@ def load_examples(path):
     return lines
 
 def trainable_names(model):
-    """Only tune the final two transformer blocks and the final layer norm."""
+    """Only tune the final four transformer blocks and the final layer norm."""
     names = []
     for name, parameter in model.named_parameters():
-        active = name.startswith("transformer.h.10.") or name.startswith("transformer.h.11.") or name.startswith("transformer.ln_f.")
+        active = any(name.startswith(f"transformer.h.{i}.") for i in range(8, 12)) or name.startswith("transformer.ln_f.")
         parameter.requires_grad_(active)
         if active:
             names.append(name)
@@ -125,7 +125,7 @@ def write_report(out, directory):
     lines = [
         "# GPT-2 Goofball — coherent but stupid 🤡",
         "",
-        "Instead of severely scrambling weights, this experiment fine-tunes GPT-2's final two",
+        "Instead of severely scrambling weights, this experiment fine-tunes GPT-2's final four",
         "transformer blocks on **102 original examples of confident, absurd answers**.",
         "Both conditions use identical prompts and sample seeds, with the same two examples",
         "in the prompt. Judge the outputs yourself: this is not an automated coherence score.",
@@ -151,9 +151,9 @@ def main():
     parser.add_argument("--data", type=Path, default=Path("gpt2-goofball/training_data.jsonl"))
     parser.add_argument("--output-dir", type=Path, default=Path("gpt2-goofball/results"))
     parser.add_argument("--seed", type=int, default=20261017)
-    parser.add_argument("--steps", type=int, default=160)
-    parser.add_argument("--epochs", type=int, default=3)
-    parser.add_argument("--lr", type=float, default=0.00015)
+    parser.add_argument("--steps", type=int, default=800)
+    parser.add_argument("--epochs", type=int, default=12)
+    parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--new-tokens", type=int, default=56)
     parser.add_argument("--load-adapter", type=Path, default=None, help="Skip training and load saved final-layer weights")
     args = parser.parse_args()
