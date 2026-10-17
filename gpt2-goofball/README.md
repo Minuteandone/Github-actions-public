@@ -9,11 +9,11 @@ For example, the training examples explain that bananas curve because they're tr
 ## How it works
 - Downloads pretrained 124M-parameter GPT-2.
 - Takes an untuned baseline using eight **held-out questions**, fixed seeds and a two-example goofy prompt.
-- Trains using answer-only causal loss for up to 800 steps, with gradient clipping and a short warmup. The only changed weights are the final four blocks and final layer normalization.
-- Samples the same held-out questions after tuning using identical prompts, seeds and sampling parameters.
+- Trains using answer-only causal loss for up to 200 steps, with gradient clipping and a short warmup. The only changed weights are the final four blocks and final layer normalization.
+- Samples the same held-out questions after tuning using identical prompts, seeds and question-derived grammatical answer starters. The model must still generate the explanation.
 - Saves a side-by-side Markdown report, structured JSON, and an **adapter of changed layers** (`goofball_adapter.safetensors`) to the GitHub Actions run artifact.
 
-**Important:** The output may still be weird or imperfect. A lower training loss doesn't prove humor or coherence; actually read the generations! The plain-language evaluation loss is a useful guardrail, not a definitive coherence metric.
+**Important:** The output may still be weird or imperfect. An earlier 800-step run badly overfit these 102 examples, so 200 steps is the new default. A lower training loss doesn't prove humor or coherence; actually read the generations! The plain-language evaluation loss is a useful guardrail, not a definitive coherence metric.
 
 ## Run
 Go to [Actions → GPT-2 Goofball](../../actions/workflows/gpt2-goofball.yml), choose **Run workflow** and optionally adjust the number of training steps. Initial commits to this experiment also trigger a run. The job summary contains all samples, and the run artifact contains the changed weights for reproducibility.
@@ -22,7 +22,7 @@ Go to [Actions → GPT-2 Goofball](../../actions/workflows/gpt2-goofball.yml), c
 Install PyTorch and dependencies listed in `gpt2-blender/requirements.txt`, then from the repository root:
 
 ```bash
-python gpt2-goofball/experiment.py --steps 800
+python gpt2-goofball/experiment.py --steps 200
 ```
 
 To reuse the saved edited layers, unzip `goofball_adapter.safetensors` from the artifact and run:

@@ -4,6 +4,7 @@ import argparse
 import json
 import math
 import random
+import re
 import time
 from pathlib import Path
 
@@ -55,12 +56,30 @@ def text_loss(model, tokenizer, text):
     loss = model(**data, labels=data.input_ids).loss.item()
     return round(loss, 4) if math.isfinite(loss) else None
 
+def answer_starter(question):
+    """Turn the question into a grammatical, topic-preserving answer stem."""
+    q = question.strip().rstrip("?").strip()
+    for pattern, formatter in (
+        (r"^Why do (.+)$", lambda m: m[1][0].upper() + m[1][1:] + " because "),
+        (r"^Why is (.+?) (always .+)$", lambda m: m[1] + " is " + m[2] + " because "),
+        (r"^Can (an? [^ ]+) (.+)$", lambda m: "Yes. " + m[1][0].upper() + m[1][1:] + " can " + m[2] + " because "),
+        (r"^How can I (.+)$", lambda m: "You can " + m[1] + " by "),
+        (r"^How would you (.+)$", lambda m: "You could " + m[1] + " by "),
+        (r"^What happens when (.+)$", lambda m: "When " + m[1][0].lower() + m[1][1:] + ", "),
+        (r"^What is the best way to (.+)$", lambda m: "The best way to " + m[1] + " is to "),
+    ):
+        match = re.match(pattern, q, re.IGNORECASE)
+        if match:
+            return formatter(match)
+    return "The explanation is simple: "
+
 @torch.inference_mode()
 def answers(model, tokenizer, seed, max_tokens, with_examples=True):
     model.eval()
     out = []
     for i, question in enumerate(QUESTIONS):
-        prompt = (FEWSHOT if with_examples else "") + f"Question: {question}\nAnswer:"
+        starter = answer_starter(question)
+        prompt = (FEWSHOT if with_examples else "") + f"Question: {question}\nAnswer: {starter}"
         tokens = tokenizer(prompt, return_tensors="pt")
         torch.manual_seed(seed + i)
         ids = model.generate(
@@ -76,7 +95,12 @@ def answers(model, tokenizer, seed, max_tokens, with_examples=True):
             use_cache=True,
         )[0, tokens.input_ids.shape[1]:]
         completion = tokenizer.decode(ids, skip_special_tokens=True).split("\n\n")[0].strip()
-        out.append({"question": question, "answer": completion})
+        answer = (starter + completion).strip()
+        # Use a complete answer when the model rambles past the token budget.
+        sentence_ends = list(re.finditer(r"[.!?](?=\s|$)", answer))
+        if sentence_ends:
+            answer = answer[:sentence_ends[min(len(sentence_ends), 2)-1].end()].strip()
+        out.append({"question": question, "answer": answer})
     return out
 
 def snapshot(model, trainable):
@@ -128,7 +152,7 @@ def write_report(out, directory):
         "Instead of severely scrambling weights, this experiment fine-tunes GPT-2's final four",
         "transformer blocks on **102 original examples of confident, absurd answers**.",
         "Both conditions use identical prompts and sample seeds, with the same two examples",
-        "in the prompt. Judge the outputs yourself: this is not an automated coherence score.",
+        "in the prompt and question-derived answer starters. Judge the outputs yourself: this is not an automated coherence score.",
         "",
         f"- Fine-tuning steps: {out['config']['steps']}",
         f"- Initial plain-language loss: {out['control']['ordinary_text_loss']}",
@@ -151,8 +175,8 @@ def main():
     parser.add_argument("--data", type=Path, default=Path("gpt2-goofball/training_data.jsonl"))
     parser.add_argument("--output-dir", type=Path, default=Path("gpt2-goofball/results"))
     parser.add_argument("--seed", type=int, default=20261017)
-    parser.add_argument("--steps", type=int, default=800)
-    parser.add_argument("--epochs", type=int, default=12)
+    parser.add_argument("--steps", type=int, default=200)
+    parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--lr", type=float, default=0.0001)
     parser.add_argument("--new-tokens", type=int, default=56)
     parser.add_argument("--load-adapter", type=Path, default=None, help="Skip training and load saved final-layer weights")
